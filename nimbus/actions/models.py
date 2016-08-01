@@ -20,13 +20,14 @@ class ModelActions:
         assert model == payload.model
 
         for column in self._unique_columns:
-            column_count = session.query(model).filter(column == payload.validated_data[column.name]).count()
-            if column_count >= 1:
-                raise errors.InstanceExists, '{model_name} with {column_name} "{column_value}" exists'.format(
-                    model_name=str(model).strip('>').strip('<').strip("'").split('.')[-1],
-                    column_name=column.name,
-                    column_value=payload.validated_data[column.name],
-                )
+            if column in payload.validated_data.keys():
+                column_count = session.query(model).filter(column == payload.validated_data[column.name]).count()
+                if column_count >= 1:
+                    raise errors.InstanceExists, '{model_name} with {column_name} "{column_value}" exists'.format(
+                        model_name=str(model).strip('>').strip('<').strip("'").split('.')[-1],
+                        column_name=column.name,
+                        column_value=payload.validated_data[column.name],
+                    )
 
         session.add(payload.instance)
         session.commit()
