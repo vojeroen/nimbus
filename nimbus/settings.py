@@ -1,6 +1,6 @@
-PROJECT_NAME = 'crm'
+PROJECT_NAME = 'my_project'
 
-SQL_ENGINE_URL = None
+SQL_ENGINE_URL = 'sqlite:///'
 
-ZMQ_API_URL = None
-ZMQ_WORKER_URL = None
+ZMQ_API_URL = 'tcp://localhost:5555'
+ZMQ_WORKER_URL = 'tcp://localhost:5556'
