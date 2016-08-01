@@ -1,0 +1,6 @@
+PROJECT_NAME = 'crm'
+
+SQL_ENGINE_URL = None
+
+ZMQ_API_URL = None
+ZMQ_WORKER_URL = None
