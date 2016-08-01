@@ -5,6 +5,7 @@ import pytz
 from sqlalchemy.orm.session import Session as SessionClass
 
 from nimbus import errors
+from nimbus.serializers import Serializer
 
 message_routes = []
 
@@ -12,6 +13,11 @@ message_routes = []
 def assert_key_present(key, message):
     if key not in message.keys():
         raise errors.MessageNotComplete, 'The message must contain the key "{key_name}"'.format(key_name=key)
+
+
+def assert_correct_type(data, data_type):
+    if not isinstance(data, data_type):
+        raise errors.MessageNotCorrect, 'The message contains incorrect data types'
 
 
 def add_route(route_id, new_route):
@@ -59,12 +65,20 @@ class Message:
 
         assert_key_present('route', message)
         assert_key_present('payload', message)
+        assert_correct_type(message['route'], str)
+        assert_correct_type(message['payload'], dict)
 
         self._route = find_route(message['route'])
         self._payload = message['payload']
         self._received_timestamp = pytz.utc.localize(datetime.datetime.utcnow())
         self._session = session
         self._processing_started = False
+
+        if 'select' in message.keys():
+            assert_correct_type(message['select'], list)
+            self._select = message['select']
+        else:
+            self._select = None
 
     @property
     def payload(self):
@@ -74,6 +88,10 @@ class Message:
     def session(self):
         return self._session
 
+    @property
+    def select(self):
+        return self._select
+
     def process(self):
         if not self._processing_started:
             self._processing_started = True
@@ -81,3 +99,29 @@ class Message:
             return response
         else:
             raise errors.MessageAlreadyProcessed, 'Message has already been processed'
+
+    def _generate_response_from_one_item(self, serializer):
+        assert isinstance(serializer, Serializer), 'The function argument must be a Serializer instance'
+
+        serialized_data = serializer.serialized_data
+
+        if self.select:
+            for key in self._select:
+                assert key in serialized_data.keys()
+            return {key: serialized_data[key] for key in self.select}
+        else:
+            return serialized_data
+
+    def generate_response(self, serializer):
+        if isinstance(serializer, Serializer):
+            response = self._generate_response_from_one_item(serializer)
+
+        elif isinstance(serializer, list):
+            response = []
+            for s in serializer:
+                response.append(self._generate_response_from_one_item(s))
+
+        else:
+            response = None
+
+        return response

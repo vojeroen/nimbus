@@ -15,28 +15,26 @@ class ModelActions:
     def create(self, message):
         session = message.session
         model = self.Meta.model
-        serializer = self.Meta.serializer
-        payload = serializer(message.payload)
-        assert model == payload.model
+        serializer = self.Meta.serializer(message.payload)
+        assert model == serializer.model
 
         for column in self._unique_columns:
-            if column in payload.validated_data.keys():
-                column_count = session.query(model).filter(column == payload.validated_data[column.name]).count()
+            if column in serializer.validated_data.keys():
+                column_count = session.query(model).filter(column == serializer.validated_data[column.name]).count()
                 if column_count >= 1:
                     raise errors.InstanceExists, '{model_name} with {column_name} "{column_value}" exists'.format(
                         model_name=str(model).strip('>').strip('<').strip("'").split('.')[-1],
                         column_name=column.name,
-                        column_value=payload.validated_data[column.name],
+                        column_value=serializer.validated_data[column.name],
                     )
 
-        session.add(payload.instance)
+        session.add(serializer.instance)
         session.commit()
-        return payload.serialized_data
+        return message.generate_response(serializer)
 
     def retrieve(self, message):
         session = message.session
         model = self.Meta.model
-        serializer = self.Meta.serializer
 
         query = session.query(model)
         for key, value in message.payload.iteritems():
@@ -55,7 +53,8 @@ class ModelActions:
                 )
 
         query_results = query.all()
-        return map(lambda instance: serializer(instance).serialized_data, query_results)
+        serializers = map(lambda instance: self.Meta.serializer(instance), query_results)
+        return message.generate_response(serializers)
 
     @classmethod
     def route_create(cls, message):

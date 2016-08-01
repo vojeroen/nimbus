@@ -14,6 +14,10 @@ class MessageNotComplete(Exception):
     pass
 
 
+class MessageNotCorrect(Exception):
+    pass
+
+
 class PayloadNotComplete(Exception):
     pass
 
