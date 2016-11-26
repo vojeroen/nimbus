@@ -107,7 +107,7 @@ class Message:
 
         if self.select:
             for key in self._select:
-                assert key in serialized_data.keys()
+                assert key in serialized_data.keys(), 'The select statement contains keys that are not in the model'
             return {key: serialized_data[key] for key in self.select}
         else:
             return serialized_data
