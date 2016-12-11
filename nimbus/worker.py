@@ -15,7 +15,7 @@ def create_error(status, description):
     assert isinstance(description, str)
 
     return msgpack.packb({'error': {'status': status,
-                                    'description': description}})
+                                    'description': description.encode()}})
 
 
 def configure():
@@ -23,15 +23,16 @@ def configure():
     assert len(messages.message_routes) >= 1, 'At least one message route must be configured'
 
 
-def run(zmq_context):
+def run():
     configure()
 
+    zmq_context = zmq.Context.instance()
     socket = zmq_context.socket(zmq.REP)
     socket.connect(ZMQ_WORKER_URL)
 
     while True:
         packed_message = socket.recv()
-        assert isinstance(packed_message, str)
+        assert isinstance(packed_message, bytes)
 
         message = msgpack.unpackb(packed_message)
         session = Session()
@@ -41,25 +42,25 @@ def run(zmq_context):
             response = message.process()
             packed_response = msgpack.packb(response)
 
-        except errors.RouteNotFound, description:
+        except errors.RouteNotFound as description:
             packed_response = create_error(400, str(description))
 
-        except errors.MessageNotComplete, description:
+        except errors.MessageNotComplete as description:
             packed_response = create_error(400, str(description))
 
-        except errors.PayloadNotCorrect, description:
+        except errors.PayloadNotCorrect as description:
             packed_response = create_error(400, str(description))
 
-        except errors.PayloadNotComplete, description:
+        except errors.PayloadNotComplete as description:
             packed_response = create_error(400, str(description))
 
-        except errors.InstanceExists, description:
+        except errors.InstanceExists as description:
             packed_response = create_error(400, str(description))
 
         except:
             import traceback
-            print sys.exc_info()[0]
-            print sys.exc_info()[1]
+            print(sys.exc_info()[0])
+            print(sys.exc_info()[1])
             traceback.print_tb(sys.exc_info()[2])
             packed_response = create_error(500, str(sys.exc_info()[1]))
 

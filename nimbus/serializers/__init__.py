@@ -1,17 +1,26 @@
+from abc import ABCMeta, abstractclassmethod
+
 from nimbus import errors
 
 
 def assert_key_present(key, data):
     if key not in data.keys():
-        raise errors.PayloadNotComplete, 'The payload must contain the key "{key_name}"'.format(key_name=key)
+        raise errors.PayloadNotComplete('The payload must contain the key "{key_name}"'.format(key_name=key))
 
 
 def assert_correct_type(data, data_type):
     if not isinstance(data, data_type):
-        raise errors.PayloadNotCorrect, 'The payload contains incorrect data types'
+        raise errors.PayloadNotCorrect('The payload contains incorrect data types')
+
+
+def assert_correct_key(data, key, data_type):
+    assert_key_present(key, data)
+    assert_correct_type(data[key], data_type)
 
 
 class Serializer:
+    __metaclass__ = ABCMeta
+
     class Meta:
         model = None
 
@@ -37,10 +46,11 @@ class Serializer:
             self.validate()
         return self._validated_data
 
-    # @validated_data.setter
-    # def validated_data(self, value):
-    #     assert isinstance(value, dict), 'Validated data must be a dictionary'
-    #     self._validated_data = value
+    @property
+    def instance(self):
+        if self._instance is None:
+            self.create_instance()
+        return self._instance
 
     @property
     def serialized_data(self):
@@ -49,22 +59,20 @@ class Serializer:
         return self._serialized_data
 
     @property
-    def instance(self):
-        if self._instance is None:
-            self._create_instance()
-        return self._instance
-
-    @property
     def model(self):
         return self.Meta.model
 
-    def _create_instance(self):
-        self._instance = self.Meta.model(**self.validated_data)
-
+    @abstractclassmethod
     def validate(self):
         """Transform self.raw_data to self._validated_data"""
         pass
 
+    @abstractclassmethod
+    def create_instance(self):
+        """Transform self.validated_data to self._instance"""
+        pass
+
+    @abstractclassmethod
     def serialize(self):
         """Transform self.instance to self._serialized_data"""
         pass

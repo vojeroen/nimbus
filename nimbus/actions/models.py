@@ -22,11 +22,11 @@ class ModelActions:
             if column in serializer.validated_data.keys():
                 column_count = session.query(model).filter(column == serializer.validated_data[column.name]).count()
                 if column_count >= 1:
-                    raise errors.InstanceExists, '{model_name} with {column_name} "{column_value}" exists'.format(
+                    raise errors.InstanceExists('{model_name} with {column_name} "{column_value}" exists'.format(
                         model_name=str(model).strip('>').strip('<').strip("'").split('.')[-1],
                         column_name=column.name,
                         column_value=serializer.validated_data[column.name],
-                    )
+                    ))
 
         session.add(serializer.instance)
         session.commit()
@@ -37,7 +37,7 @@ class ModelActions:
         model = self.Meta.model
 
         query = session.query(model)
-        for key, value in message.payload.iteritems():
+        for key, value in message.payload.items():
             if key in model.__mapper__.columns:
                 column = model.__mapper__.columns.get(key)
                 query = query.filter(column == value)
@@ -47,10 +47,10 @@ class ModelActions:
                 for column in columns:
                     query = query.filter(column == value)
             else:
-                raise errors.PayloadNotCorrect, '{model_name} does not contain the attribute {column_name}'.format(
+                raise errors.PayloadNotCorrect('{model_name} does not contain the attribute {column_name}'.format(
                     model_name=str(model).strip('>').strip('<').strip("'").split('.')[-1],
                     column_name=key,
-                )
+                ))
 
         query_results = query.all()
         serializers = map(lambda instance: self.Meta.serializer(instance), query_results)

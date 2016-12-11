@@ -12,18 +12,23 @@ message_routes = []
 
 def assert_key_present(key, message):
     if key not in message.keys():
-        raise errors.MessageNotComplete, 'The message must contain the key "{key_name}"'.format(key_name=key)
+        raise errors.MessageNotComplete('The message must contain the key "{key_name}"'.format(key_name=key))
 
 
 def assert_correct_type(data, data_type):
     if not isinstance(data, data_type):
-        raise errors.MessageNotCorrect, 'The message contains incorrect data types'
+        raise errors.MessageNotCorrect('The message contains incorrect data types')
+
+
+def assert_correct_key(data, key, data_type):
+    assert_key_present(key, data)
+    assert_correct_type(data[key], data_type)
 
 
 def add_route(route_id, new_route):
     for route in message_routes:
         if route.id == route_id:
-            raise errors.RouteAlreadyExists, 'Route with id {route_id} exists already'.format(route_id=route_id)
+            raise errors.RouteAlreadyExists('Route with id {route_id} exists already'.format(route_id=route_id))
     message_routes.append(new_route)
 
 
@@ -31,7 +36,7 @@ def find_route(message_route):
     for route in message_routes:
         if route.id == message_route:
             return route
-    raise errors.RouteNotFound, 'Requested route {route_id} not found'.format(route_id=message_route)
+    raise errors.RouteNotFound('Requested route {route_id} not found'.format(route_id=message_route))
 
 
 class Route:
@@ -63,22 +68,25 @@ class Message:
         assert isinstance(message, dict)
         assert isinstance(session, SessionClass)
 
-        assert_key_present('route', message)
-        assert_key_present('payload', message)
-        assert_correct_type(message['route'], str)
-        assert_correct_type(message['payload'], dict)
+        assert_correct_key(message, b'route', bytes)
 
-        self._route = find_route(message['route'])
-        self._payload = message['payload']
+        self._route = find_route(message[b'route'].decode())
         self._received_timestamp = pytz.utc.localize(datetime.datetime.utcnow())
         self._session = session
+        self._payload = {}
+        self._parameters = {}
         self._processing_started = False
 
-        if 'select' in message.keys():
-            assert_correct_type(message['select'], list)
-            self._select = message['select']
-        else:
-            self._select = None
+        if b'payload' in message.keys():
+            assert_correct_key(message, b'payload', dict)
+            self._payload = message[b'payload']
+
+        if b'parameters' in message.keys():
+            assert_correct_key(message, b'parameters', dict)
+            for key, value in message[b'parameters'].items():
+                assert isinstance(key, bytes)
+                assert isinstance(value, bytes)
+                self._parameters[key.decode()] = value.decode()
 
     @property
     def payload(self):
@@ -89,8 +97,8 @@ class Message:
         return self._session
 
     @property
-    def select(self):
-        return self._select
+    def parameters(self):
+        return self._parameters
 
     def process(self):
         if not self._processing_started:
@@ -98,29 +106,20 @@ class Message:
             response = self._route.action(self)
             return response
         else:
-            raise errors.MessageAlreadyProcessed, 'Message has already been processed'
+            raise errors.MessageAlreadyProcessed('Message has already been processed')
 
     def _generate_response_from_one_item(self, serializer):
         assert isinstance(serializer, Serializer), 'The function argument must be a Serializer instance'
-
         serialized_data = serializer.serialized_data
-
-        if self.select:
-            for key in self._select:
-                assert key in serialized_data.keys(), 'The select statement contains keys that are not in the model'
-            return {key: serialized_data[key] for key in self.select}
-        else:
-            return serialized_data
+        return serialized_data
 
     def generate_response(self, serializer):
         if isinstance(serializer, Serializer):
             response = self._generate_response_from_one_item(serializer)
-
         elif isinstance(serializer, list):
             response = []
             for s in serializer:
                 response.append(self._generate_response_from_one_item(s))
-
         else:
             response = None
 
