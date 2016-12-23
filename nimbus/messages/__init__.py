@@ -5,7 +5,10 @@ import pytz
 from sqlalchemy.orm.session import Session as SessionClass
 
 from nimbus import errors
+from nimbus import log
 from nimbus.serializers import Serializer
+
+logger = log.get_logger(__name__)
 
 message_routes = []
 
@@ -102,6 +105,7 @@ class Message:
 
     def process(self):
         if not self._processing_started:
+            logger.info('Processing route {}'.format(self._route.id))
             self._processing_started = True
             response = self._route.action(self)
             return response
