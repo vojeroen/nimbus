@@ -18,7 +18,7 @@ LOG_FORMAT = '%(asctime)s - %(levelname)-8s - %(name)s - %(message)s'
 LOG_STDOUT_LEVEL = log_level_mapper[cparser.get('nimbus', 'log_stdout')]
 
 LOG_FILE_LEVEL = logging.DEBUG
-LOG_FILE_LOCATION = 'gateway.log'
+LOG_FILE_LOCATION = 'nimbus.log'
 
 LOG_MAIL_FORMAT = '%(asctime)s\n%(levelname)-8s\n%(name)s\n%(message)s'
 LOG_MAIL_LEVEL = logging.ERROR
