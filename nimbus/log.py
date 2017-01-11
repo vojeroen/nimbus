@@ -3,8 +3,10 @@ import logging
 import sys
 from logging.handlers import SMTPHandler
 
+from nimbus.settings import PROJECT_NAME
+
 cparser = configparser.ConfigParser()
-cparser.read('log.config')
+cparser.read('{pn}.config'.format(pn=PROJECT_NAME))
 
 log_level_mapper = {
     'error': logging.ERROR,
@@ -15,10 +17,10 @@ log_level_mapper = {
 
 LOG_FORMAT = '%(asctime)s - %(levelname)-8s - %(name)s - %(message)s'
 
-LOG_STDOUT_LEVEL = log_level_mapper[cparser.get('nimbus', 'log_stdout')]
+LOG_STDOUT_LEVEL = log_level_mapper[cparser.get('log', 'log_stdout')]
 
 LOG_FILE_LEVEL = logging.DEBUG
-LOG_FILE_LOCATION = 'nimbus.log'
+LOG_FILE_LOCATION = '{pn}.log'.format(pn=PROJECT_NAME)
 
 LOG_MAIL_FORMAT = '%(asctime)s\n%(levelname)-8s\n%(name)s\n%(message)s'
 LOG_MAIL_LEVEL = logging.ERROR
@@ -38,7 +40,7 @@ root_logger.addHandler(file_handler)
 
 mail_handler = SMTPHandler(mailhost='localhost',
                            fromaddr='gateway@mist-services.eu',
-                           toaddrs='vo.jeroen@gmail.com',
+                           toaddrs='jeroen@mist-services.eu',
                            subject='An error occured in nimbus')
 mail_handler.setFormatter(logging.Formatter(LOG_MAIL_FORMAT))
 mail_handler.setLevel(LOG_MAIL_LEVEL)
