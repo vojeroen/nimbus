@@ -4,11 +4,11 @@ import inspect
 import pytz
 from sqlalchemy.orm.session import Session as SessionClass
 
+from nimbus import config
 from nimbus import errors
-from nimbus import log
 from nimbus.serializers import Serializer
 
-logger = log.get_logger(__name__)
+logger = config.get_logger(__name__)
 
 message_routes = []
 

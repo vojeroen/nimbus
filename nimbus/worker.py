@@ -4,10 +4,12 @@ import sys
 import msgpack
 import zmq
 
+from nimbus import config
 from nimbus import errors
 from nimbus.messages import Message
 from nimbus.models import Session
-from nimbus.settings import ZMQ_WORKER_URL, PROJECT_NAME
+
+PROJECT_NAME = config.cparser.get('general', 'name')
 
 
 def create_error(status, description):
@@ -26,9 +28,11 @@ def configure():
 def run():
     configure()
 
+    zmq_worker_url = 'tcp://{}:{}'.format(config.cparser.get('crm', 'worker_hostname'),
+                                          config.cparser.get('crm', 'worker_port'))
     zmq_context = zmq.Context.instance()
     socket = zmq_context.socket(zmq.REP)
-    socket.connect(ZMQ_WORKER_URL)
+    socket.connect(zmq_worker_url)
 
     while True:
         packed_message = socket.recv()

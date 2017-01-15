@@ -1,3 +1,4 @@
+import configparser
 import datetime
 import uuid
 
@@ -9,12 +10,15 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import scoped_session, sessionmaker
 
 from nimbus.models.types import UUID
-from nimbus.settings import SQL_ENGINE_URL
 
 
 def get_utc_timestamp():
     return pytz.utc.localize(datetime.datetime.utcnow())
 
+
+alembic_parser = configparser.ConfigParser()
+alembic_parser.read('alembic.ini')
+SQL_ENGINE_URL = alembic_parser.get('alembic', 'sqlalchemy.url')
 
 engine = create_engine(SQL_ENGINE_URL, echo=False)
 Session = scoped_session(sessionmaker(bind=engine))

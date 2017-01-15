@@ -1,16 +1,21 @@
 import zmq
 
-from nimbus.settings import ZMQ_API_URL, ZMQ_WORKER_URL
+from nimbus import config
 
 
 def run():
     zmq_context = zmq.Context.instance()
 
+    zmq_worker_url = 'tcp://{}:{}'.format(config.cparser.get('crm', 'worker_hostname'),
+                                          config.cparser.get('crm', 'worker_port'))
+    zmq_api_url = 'tcp://{}:{}'.format(config.cparser.get('crm', 'api_hostname'),
+                                       config.cparser.get('crm', 'api_port'))
+
     frontend = zmq_context.socket(zmq.XREP)
-    frontend.bind(ZMQ_API_URL)
+    frontend.bind(zmq_api_url)
 
     backend = zmq_context.socket(zmq.XREQ)
-    backend.bind(ZMQ_WORKER_URL)
+    backend.bind(zmq_worker_url)
 
     try:
         zmq.device(zmq.QUEUE, frontend, backend)
