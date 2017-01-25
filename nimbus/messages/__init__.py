@@ -89,7 +89,10 @@ class Message:
             for key, value in message[b'parameters'].items():
                 assert isinstance(key, bytes)
                 assert isinstance(value, bytes)
-                self._parameters[key.decode()] = value.decode()
+                try:
+                    self._parameters[key.decode()] = value.decode()
+                except UnicodeDecodeError:
+                    self._parameters[key.decode()] = value
 
     @property
     def payload(self):
