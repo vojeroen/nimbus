@@ -24,11 +24,12 @@ class Serializer:
     class Meta:
         model = None
 
-    def __init__(self, data=None):
+    def __init__(self, data=None, serialize_children=True):
         self._raw_data = None
         self._validated_data = None
         self._serialized_data = None
         self._instance = None
+        self._serialize_children = serialize_children
 
         if isinstance(data, dict):
             self._raw_data = data
@@ -61,6 +62,10 @@ class Serializer:
     @property
     def model(self):
         return self.Meta.model
+
+    @property
+    def serialize_children(self):
+        return self._serialize_children
 
     @abstractclassmethod
     def validate(self):
