@@ -130,4 +130,5 @@ class Message:
         else:
             response = None
 
+        logger.debug('Sending response {}'.format(response))
         return response
