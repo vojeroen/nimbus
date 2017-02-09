@@ -24,7 +24,8 @@ class Serializer:
     class Meta:
         model = None
 
-    def __init__(self, data=None, serialize_children=True):
+    def __init__(self, data=None, parent=None, serialize_children=True):
+        self._parent = parent
         self._raw_data = None
         self._validated_data = None
         self._serialized_data = None
@@ -64,8 +65,20 @@ class Serializer:
         return self.Meta.model
 
     @property
+    def parent(self):
+        return self._parent
+
+    @property
     def serialize_children(self):
         return self._serialize_children
+
+    def validate_key(self, key, data_type):
+        if key.encode() in self.raw_data.keys():
+            assert_correct_type(self.raw_data[key.encode()], data_type)
+            if data_type == bytes:
+                self._validated_data[key] = self.raw_data[key.encode()].decode()
+            else:
+                self._validated_data[key] = self.raw_data[key.encode()]
 
     @abstractclassmethod
     def validate(self):
