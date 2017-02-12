@@ -28,8 +28,8 @@ def configure():
 def run():
     configure()
 
-    zmq_worker_url = 'tcp://{}:{}'.format(config.cparser.get('crm', 'worker_hostname'),
-                                          config.cparser.get('crm', 'worker_port'))
+    zmq_worker_url = 'tcp://{}:{}'.format(config.cparser.get('zmq', 'worker_hostname'),
+                                          config.cparser.get('zmq', 'worker_port'))
     zmq_context = zmq.Context.instance()
     socket = zmq_context.socket(zmq.REP)
     socket.connect(zmq_worker_url)

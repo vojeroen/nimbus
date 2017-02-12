@@ -6,10 +6,10 @@ from nimbus import config
 def run():
     zmq_context = zmq.Context.instance()
 
-    zmq_worker_url = 'tcp://{}:{}'.format(config.cparser.get('crm', 'worker_hostname'),
-                                          config.cparser.get('crm', 'worker_port'))
-    zmq_api_url = 'tcp://{}:{}'.format(config.cparser.get('crm', 'api_hostname'),
-                                       config.cparser.get('crm', 'api_port'))
+    zmq_worker_url = 'tcp://{}:{}'.format(config.cparser.get('zmq', 'worker_hostname'),
+                                          config.cparser.get('zmq', 'worker_port'))
+    zmq_api_url = 'tcp://{}:{}'.format(config.cparser.get('zmq', 'api_hostname'),
+                                       config.cparser.get('zmq', 'api_port'))
 
     frontend = zmq_context.socket(zmq.XREP)
     frontend.bind(zmq_api_url)
