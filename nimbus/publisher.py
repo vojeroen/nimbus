@@ -14,8 +14,7 @@ def run():
     api_url = 'tcp://{}:{}'.format(config.cparser.get('zmq', 'api_pub_hostname'),
                                    config.cparser.get('zmq', 'api_pub_port'))
 
-    worker = context.socket(zmq.SUB)
-    worker.setsockopt_string(zmq.SUBSCRIBE, 'pub')
+    worker = context.socket(zmq.ROUTER)
     worker.bind(worker_url)
 
     api = context.socket(zmq.PUB)
@@ -29,10 +28,11 @@ def run():
 
     while True:
         sockets = dict(poller.poll())
+        logger.info('Received data')
 
         if worker in sockets.keys() and sockets[worker] == zmq.POLLIN:
-            raw_data = worker.recv()
-            topic, packed_data = raw_data.split()
+            worker_id, empty, packed_data = worker.recv_multipart()
+            worker.send_multipart([worker_id, empty, msgpack.packb({'message': 'ok'})])
             data = msgpack.unpackb(packed_data)
             logger.debug('Publishing data: {}'.format(data))
 
