@@ -25,20 +25,22 @@ class Serializer:
     class Meta:
         model = None
 
-    def __init__(self, data=None, parent=None, serialize_children=True):
+    def __init__(self, data=None, parent=None, serialize_children=True, instance=None):
         self._parent = parent
         self._raw_data = None
         self._validated_data = None
         self._serialized_data = None
-        self._instance = None
         self._serialize_children = serialize_children
         self._session = Session()
 
         if isinstance(data, dict):
             self._raw_data = data
+            self._instance = instance
+            self._must_update_instance = True
 
         elif isinstance(data, self.Meta.model):
             self._instance = data
+            self._must_update_instance = False
 
     @property
     def raw_data(self):
@@ -52,8 +54,9 @@ class Serializer:
 
     @property
     def instance(self):
-        if self._instance is None:
+        if self._must_update_instance:
             self.create_instance()
+            self._must_update_instance = False
         return self._instance
 
     @property
