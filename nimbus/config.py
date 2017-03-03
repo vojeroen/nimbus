@@ -38,10 +38,11 @@ file_handler.setLevel(log_level_mapper[cparser.get('logging', 'file_level')])
 root_logger.addHandler(file_handler)
 
 # Logging to mail
-mail_handler = SMTPHandler(mailhost='localhost',
-                           fromaddr=cparser.get('logging', 'mail_from'),
-                           toaddrs=cparser.get('logging', 'mail_to'),
-                           subject='Error in {}'.format(cparser.get('general', 'name')))
-mail_handler.setFormatter(logging.Formatter(mail_log_format))
-mail_handler.setLevel(log_level_mapper[cparser.get('logging', 'mail_level')])
-root_logger.addHandler(mail_handler)
+if cparser.has_option('logging', 'mail_level'):
+    mail_handler = SMTPHandler(mailhost='localhost',
+                               fromaddr=cparser.get('logging', 'mail_from'),
+                               toaddrs=cparser.get('logging', 'mail_to'),
+                               subject='Error in {}'.format(cparser.get('general', 'name')))
+    mail_handler.setFormatter(logging.Formatter(mail_log_format))
+    mail_handler.setLevel(log_level_mapper[cparser.get('logging', 'mail_level')])
+    root_logger.addHandler(mail_handler)

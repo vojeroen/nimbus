@@ -9,6 +9,7 @@ from nimbus import errors
 from nimbus.messages import Message
 from nimbus.models import Session
 
+logger = config.get_logger(__name__)
 PROJECT_NAME = config.cparser.get('general', 'name')
 
 
@@ -63,9 +64,9 @@ def run():
 
         except:
             import traceback
-            print(sys.exc_info()[0])
-            print(sys.exc_info()[1])
-            traceback.print_tb(sys.exc_info()[2])
+            logger.error(sys.exc_info()[0])
+            logger.error(sys.exc_info()[1])
+            logger.error(traceback.extract_tb(sys.exc_info()[2]))
             packed_response = create_error(500, str(sys.exc_info()[1]))
 
         socket.send(packed_response)
