@@ -4,7 +4,7 @@ import uuid
 
 import pytz
 from sqlalchemy import Column
-from sqlalchemy import DateTime
+from sqlalchemy import Integer
 from sqlalchemy import String
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
@@ -17,8 +17,17 @@ from nimbus.models.types import UUID
 logger = get_logger(__name__)
 
 
-def get_utc_timestamp():
-    return pytz.utc.localize(datetime.datetime.utcnow())
+def unix_to_ts(unix_timestamp):
+    return pytz.utc.localize(datetime.datetime.utcfromtimestamp(unix_timestamp))
+
+
+def ts_to_unix(timestamp):
+    diff = timestamp - pytz.utc.localize(datetime.datetime(1970, 1, 1))
+    return int(diff.total_seconds())
+
+
+def get_utc_int():
+    return ts_to_unix(pytz.utc.localize(datetime.datetime.utcnow()))
 
 
 alembic_parser = configparser.ConfigParser()
@@ -33,8 +42,8 @@ class Base(object):
     query = Session.query_property()
 
     uuid = Column(UUID, primary_key=True, default=uuid.uuid4)
-    timestamp_created = Column(DateTime, default=get_utc_timestamp, nullable=False)
-    timestamp_updated = Column(DateTime, default=get_utc_timestamp, onupdate=get_utc_timestamp, nullable=False)
+    timestamp_created = Column(Integer, default=get_utc_int, nullable=False)
+    timestamp_updated = Column(Integer, default=get_utc_int, onupdate=get_utc_int, nullable=False)
 
     @property
     def uuid_str(self):
@@ -45,7 +54,7 @@ class History:
     _history_uuid = Column(UUID, primary_key=True, default=uuid.uuid4)
     _history_action = Column(String, nullable=False)
     uuid = Column(UUID, nullable=False)
-    timestamp_updated = Column(DateTime, nullable=False)
+    timestamp_updated = Column(Integer, nullable=False)
 
     def __init__(self, old_obj):
         columns = old_obj.__class__.__table__.columns
