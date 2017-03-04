@@ -9,8 +9,12 @@ from sqlalchemy import String
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy_utils import Choice
 
+from nimbus.config import get_logger
 from nimbus.models.types import UUID
+
+logger = get_logger(__name__)
 
 
 def get_utc_timestamp():
@@ -46,7 +50,10 @@ class History:
     def __init__(self, old_obj):
         columns = old_obj.__class__.__table__.columns
         for column in columns:
-            setattr(self, column.name, getattr(old_obj, column.name))
+            old_attr = getattr(old_obj, column.name)
+            if isinstance(old_attr, Choice):
+                old_attr = old_attr.code
+            setattr(self, column.name, old_attr)
 
 
 Base = declarative_base(cls=Base)
