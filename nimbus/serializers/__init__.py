@@ -24,6 +24,7 @@ class Serializer:
 
     class Meta:
         model = None
+        parent = None
 
     def __init__(self, data=None, parent=None, serialize_children=True, instance=None):
         self._parent = parent
@@ -57,6 +58,16 @@ class Serializer:
         if self._must_update_instance:
             self.create_instance()
             self._must_update_instance = False
+
+        # Check if the parent object is complete
+        # WARNING: never commit during the create_instance method
+        if self._parent:
+            assert isinstance(self._parent, self.Meta.parent)
+            assert self._parent.is_complete
+        elif self.Meta.parent:
+            assert self._session.query(self.Meta.parent).join(self.Meta.model) \
+                .filter(self.Meta.model.uuid == self._instance.uuid).one().is_complete
+
         return self._instance
 
     @property
