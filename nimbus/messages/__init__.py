@@ -103,6 +103,10 @@ class Message:
         return self._session
 
     @property
+    def route(self):
+        return self._route
+
+    @property
     def parameters(self):
         return self._parameters
 

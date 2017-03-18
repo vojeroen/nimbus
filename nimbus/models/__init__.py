@@ -39,6 +39,7 @@ Session = scoped_session(sessionmaker(bind=engine))
 
 
 class Base(object):
+    session = Session.session_factory()
     query = Session.query_property()
 
     uuid = Column(UUID, primary_key=True, default=uuid.uuid4)

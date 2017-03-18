@@ -26,12 +26,12 @@ class Serializer:
         model = None
         parent = None
 
-    def __init__(self, data=None, parent=None, serialize_children=True, instance=None):
+    def __init__(self, data=None, parent=None, instance=None, strict_parent_checking=True):
         self._parent = parent
         self._raw_data = None
         self._validated_data = None
         self._serialized_data = None
-        self._serialize_children = serialize_children
+        self._strict_parent_checking = strict_parent_checking
         self._session = Session()
 
         if isinstance(data, dict):
@@ -59,15 +59,21 @@ class Serializer:
             self.create_instance()
             self._must_update_instance = False
 
-        # Check if the parent object is complete
-        # WARNING: never commit during the create_instance method
+        try:
+            assert self.Meta.parent is not None
+        except AttributeError:
+            assert self._parent is None
+            return self._instance
+
+            # Check if the parent object is complete
+            # WARNING: never commit during the create_instance method
         if self._parent:
             assert isinstance(self._parent, self.Meta.parent)
-            assert self._parent.is_complete
-        elif self.Meta.parent:
+            if self._strict_parent_checking:
+                assert self._parent.is_complete
+        elif self.Meta.parent and self._strict_parent_checking:
             assert self._session.query(self.Meta.parent).join(self.Meta.model) \
                 .filter(self.Meta.model.uuid == self._instance.uuid).one().is_complete
-
         return self._instance
 
     @property
@@ -77,16 +83,8 @@ class Serializer:
         return self._serialized_data
 
     @property
-    def model(self):
-        return self.Meta.model
-
-    @property
     def parent(self):
         return self._parent
-
-    @property
-    def serialize_children(self):
-        return self._serialize_children
 
     def validate_key(self, key, data_type):
         if key.encode() in self.raw_data.keys():
