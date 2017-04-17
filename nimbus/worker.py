@@ -16,9 +16,10 @@ PROJECT_NAME = config.cparser.get('general', 'name')
 def create_error(status, description):
     assert isinstance(status, int)
     assert isinstance(description, str)
-
-    return msgpack.packb({'error': {'status': status,
-                                    'description': description.encode()}})
+    response = msgpack.packb({'error': {'status': status,
+                                        'description': description.encode()}})
+    logger.debug('An error occurred: {}'.format(response))
+    return response
 
 
 def configure():
@@ -46,21 +47,27 @@ def run():
             message = Message(message, session)
             response = message.process()
             packed_response = msgpack.packb(response)
+            session.commit()
 
         except errors.RouteNotFound as description:
             packed_response = create_error(400, str(description))
+            session.rollback()
 
         except errors.MessageNotComplete as description:
             packed_response = create_error(400, str(description))
+            session.rollback()
 
         except errors.PayloadNotCorrect as description:
             packed_response = create_error(400, str(description))
+            session.rollback()
 
         except errors.PayloadNotComplete as description:
             packed_response = create_error(400, str(description))
+            session.rollback()
 
         except errors.InstanceExists as description:
             packed_response = create_error(400, str(description))
+            session.rollback()
 
         except:
             import traceback
@@ -68,7 +75,7 @@ def run():
             logger.error(sys.exc_info()[1])
             logger.error(traceback.extract_tb(sys.exc_info()[2]))
             packed_response = create_error(500, str(sys.exc_info()[1]))
+            session.rollback()
 
         socket.send(packed_response)
-        session.commit()
         session.close()
