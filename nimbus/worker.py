@@ -16,9 +16,9 @@ PROJECT_NAME = config.cparser.get('general', 'name')
 def create_error(status, description):
     assert isinstance(status, int)
     assert isinstance(description, str)
+    logger.debug('An error occurred: {}'.format(description))
     response = msgpack.packb({'error': {'status': status,
                                         'description': description.encode()}})
-    logger.debug('An error occurred: {}'.format(response))
     return response
 
 

@@ -125,6 +125,7 @@ class Message:
         return serialized_data
 
     def generate_response(self, serializer):
+        self._session.commit()  # commit before making response to prevent errors with new objects
         if isinstance(serializer, Serializer):
             response = self._generate_response_from_one_item(serializer)
         elif isinstance(serializer, list):
