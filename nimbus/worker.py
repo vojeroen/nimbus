@@ -41,7 +41,7 @@ def run():
         assert isinstance(packed_message, bytes)
 
         message = msgpack.unpackb(packed_message)
-        session = Session()
+        session = Session.session_factory()
 
         try:
             message = Message(message, session)
