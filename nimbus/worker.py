@@ -23,7 +23,7 @@ def create_error(status, description):
 
 
 def configure():
-    messages = importlib.import_module('{pn}.messages'.format(pn=PROJECT_NAME))
+    messages = importlib.import_module('{pn}.api.messages'.format(pn=PROJECT_NAME))
     assert len(messages.message_routes) >= 1, 'At least one message route must be configured'
 
 
