@@ -1,34 +1,20 @@
 import configparser
-import datetime
 import uuid
 
-import pytz
 from sqlalchemy import Column
 from sqlalchemy import Integer
 from sqlalchemy import String
 from sqlalchemy import create_engine
+from sqlalchemy.event import listens_for
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy_utils import Choice
 
-from nimbus.config import get_logger
+from nimbus.helpers import get_utc_int
+from nimbus.log import get_logger
 from nimbus.models.types import UUID
 
 logger = get_logger(__name__)
-
-
-def unix_to_ts(unix_timestamp):
-    return pytz.utc.localize(datetime.datetime.utcfromtimestamp(unix_timestamp))
-
-
-def ts_to_unix(timestamp):
-    diff = timestamp - pytz.utc.localize(datetime.datetime(1970, 1, 1))
-    return int(diff.total_seconds())
-
-
-def get_utc_int():
-    return ts_to_unix(pytz.utc.localize(datetime.datetime.utcnow()))
-
 
 alembic_parser = configparser.ConfigParser()
 alembic_parser.read('alembic.ini')
@@ -67,3 +53,32 @@ class History:
 
 
 Base = declarative_base(cls=Base)
+
+
+@listens_for(Session, 'before_flush')
+def check_before_flush(session, flush_context, instances):
+    for new_obj in session.new:
+        if 'validate_new' in dir(new_obj.__class__):
+            new_obj.__class__.validate_new(session, new_obj)
+
+
+@listens_for(Session, 'after_flush')
+def check_after_flush(session, flush_context):
+    # history
+    for new_obj in session.new:
+        if '__history__' in dir(new_obj.__class__):
+            cpy = new_obj.__class__.__history__(new_obj)
+            cpy._history_action = 'A'
+            session.add(cpy)
+
+    for dirty_obj in session.dirty:
+        if '__history__' in dir(dirty_obj.__class__):
+            cpy = dirty_obj.__class__.__history__(dirty_obj)
+            cpy._history_action = 'M'
+            session.add(cpy)
+
+    for deleted_obj in session.deleted:
+        if '__history__' in dir(deleted_obj.__class__):
+            cpy = deleted_obj.__class__.__history__(deleted_obj)
+            cpy._history_action = 'D'
+            session.add(cpy)
