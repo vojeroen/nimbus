@@ -82,3 +82,7 @@ class Client:
 
     def delete(self, endpoint, parameters=None, data=None, decode_response=True):
         return self.send_and_recv('DELETE', endpoint, parameters, data, decode_response)
+
+    def close(self):
+        self._socket.close()
+      
