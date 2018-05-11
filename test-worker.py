@@ -9,7 +9,7 @@ def def_for_endpoint(message):
     print(message.endpoint)
     print(message.parameters)
     print(message.data)
-    return 'OK ' + worker.endpoint_for('def_for_endpoint') + ' ' + str(message.data['counter']), 200
+    return 'OK ' + worker.endpoint_for('def_for_endpoint') + ' ' + str(message.data[b'counter']), 200
 
 
 worker.run()
