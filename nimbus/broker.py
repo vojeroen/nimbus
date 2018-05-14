@@ -472,6 +472,6 @@ class Broker:
                 self._client_socket.send_multipart(client_response)
 
             # send requests to workers
-            for worker_id, request in request_manager.items():
+            for worker_id, request in request_manager():
                 logger.debug('Sending to {}: {}'.format(worker_id, request.content))
                 self._worker_control_socket.send_multipart([worker_id, b'', msgpack.packb(request.content)])
