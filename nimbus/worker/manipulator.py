@@ -1,5 +1,5 @@
 from nimbus.worker.errors import DataNotCorrect
-from nimbus.worker.message import assert_correct_type
+from nimbus.worker.helpers import assert_correct_type
 
 
 class Manipulator:
