@@ -1,6 +1,11 @@
 import datetime
 
 import pytz
+import zmq
+
+from nimbus.log import get_logger
+
+logger = get_logger(__name__)
 
 
 def decode(obj):
@@ -37,3 +42,24 @@ def ts_to_unix(timestamp):
 
 def get_utc_int():
     return ts_to_unix(pytz.utc.localize(datetime.datetime.utcnow()))
+
+
+def get_data_from_zmq(socket, timeout):
+    launch_timestamp = datetime.datetime.now()
+    finished = False
+
+    poller = zmq.Poller()
+    poller.register(socket, zmq.POLLIN)
+
+    while not finished:
+        sockets = dict(poller.poll(timeout=timeout))
+
+        if socket in sockets.keys() and sockets[socket] == zmq.POLLIN:
+            response = socket.recv()
+            return response
+
+        if launch_timestamp + datetime.timedelta(seconds=int(timeout / 1000)) < datetime.datetime.now():
+            logger.debug('Timeout')
+            finished = True
+
+    return {}
