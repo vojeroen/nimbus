@@ -85,4 +85,3 @@ class Client:
 
     def close(self):
         self._socket.close()
-      
