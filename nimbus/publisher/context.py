@@ -1,14 +1,15 @@
 import msgpack
 import zmq
 
+from nimbus import config
 from nimbus.helpers import get_data_from_zmq
 
 ZMQ_TIMEOUT_SEC = 10
 
 
-class PublishContext():
+class PublishContext:
     def __init__(self,
-                 connect='tcp://127.0.0.1:5004',
+                 connect,
                  timeout=None):
         self._context = zmq.Context.instance()
         self._socket = self._context.socket(zmq.REQ)
@@ -25,4 +26,6 @@ class PublishContext():
         return zmq_response
 
 
-ctx_publisher = PublishContext()
+zmq_publisher = 'tcp://{}:{}'.format(config.get('publisher', 'worker_hostname'),
+                                     config.get('publisher', 'worker_port'))
+ctx_publisher = PublishContext(connect=zmq_publisher)
