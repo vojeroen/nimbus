@@ -19,6 +19,9 @@ fi
 
 mkdir ${BUILD_DIR}
 cp -r nimbus ${BUILD_DIR}
+cp -r requirements.txt ${BUILD_DIR}
+cp -r run_broker.py ${BUILD_DIR}
+cp -r run_publisher.py ${BUILD_DIR}
 
 tar -c -f ${FNAME_TAR} --exclude=*.pyc --exclude=__pycache__ -C ${BUILD_DIR} .
 

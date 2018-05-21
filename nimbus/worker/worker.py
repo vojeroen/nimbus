@@ -16,8 +16,8 @@ logger = get_logger(__name__)
 
 class Worker:
     def __init__(self,
-                 connect_control='tcp://localhost:5001',
-                 connect_response='tcp://localhost:5002'):
+                 connect_control,
+                 connect_response):
         self._url_connect_control = connect_control
         self._url_connect_response = connect_response
 
