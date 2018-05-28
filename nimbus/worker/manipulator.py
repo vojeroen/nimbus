@@ -8,7 +8,7 @@ class Manipulator:
 
     def __init__(self, obj):
         self._object = obj
-        if not isinstance(obj, self.__class__.MODEL):
+        if not isinstance(obj, self.MODEL):
             raise DataNotCorrect
 
     @property

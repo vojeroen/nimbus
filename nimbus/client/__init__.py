@@ -15,7 +15,7 @@ Response = namedtuple('Response', ['response', 'status_code'])
 
 class Client:
     def __init__(self,
-                 connect='tcp://127.0.0.1:5003',
+                 connect,
                  timeout=None):
         self._context = zmq.Context.instance()
         self._socket = self._context.socket(zmq.REQ)
@@ -52,6 +52,9 @@ class Client:
 
     def get(self, endpoint, parameters=None, data=None, decode_response=True):
         return self.send_and_recv('GET', endpoint, parameters, data, decode_response)
+
+    def list(self, endpoint, parameters=None, data=None, decode_response=True):
+        return self.send_and_recv('LIST', endpoint, parameters, data, decode_response)
 
     def post(self, endpoint, parameters=None, data=None, decode_response=True):
         return self.send_and_recv('POST', endpoint, parameters, data, decode_response)
