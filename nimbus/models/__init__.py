@@ -1,5 +1,6 @@
 import configparser
 import uuid
+from collections import namedtuple
 
 from sqlalchemy import Column
 from sqlalchemy import Integer
@@ -53,6 +54,27 @@ class History:
 
 
 Base = declarative_base(cls=Base)
+
+
+def retrieve_changed_objects_from_session(cls, session):
+    Objects = namedtuple('Objects', 'created updated deleted')
+    objects = Objects(created=set(),
+                      updated=set(),
+                      deleted=set())
+
+    for object in session.new:
+        if isinstance(object, cls):
+            objects.created.add(object)
+
+    for object in session.dirty:
+        if isinstance(object, cls) and session.is_modified(object):
+            objects.updated.add(object)
+
+    for object in session.deleted:
+        if isinstance(object, cls):
+            objects.deleted.add(object)
+
+    return objects
 
 
 @listens_for(Session, 'before_flush')
