@@ -22,11 +22,11 @@ alembic_parser.read('alembic.ini')
 SQL_ENGINE_URL = alembic_parser.get('alembic', 'sqlalchemy.url')
 
 engine = create_engine(SQL_ENGINE_URL, echo=False)
-Session = scoped_session(sessionmaker(bind=engine))
+Session = scoped_session(sessionmaker(bind=engine, autoflush=False))
 
 
 class Base(object):
-    session = Session.session_factory()
+    session = Session()
     query = Session.query_property()
 
     uuid = Column(UUID, primary_key=True, default=uuid.uuid4)
