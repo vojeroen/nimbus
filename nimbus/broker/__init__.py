@@ -14,8 +14,8 @@ from nimbus.statemanager import ConnectionStateManager
 
 logger = get_logger(__name__)
 
-SECONDS_BEFORE_CONTACT_CHECK = config.get('control', 'seconds_before_contact_check')
-SECONDS_BEFORE_UNREGISTER = config.get('control', 'seconds_before_unregister')
+SECONDS_BEFORE_CONTACT_CHECK = int(config.get('control', 'seconds_before_contact_check'))
+SECONDS_BEFORE_UNREGISTER = int(config.get('control', 'seconds_before_unregister'))
 
 
 class EmptyQueue(LookupError):

@@ -15,8 +15,8 @@ from nimbus.worker.request import Request
 
 logger = get_logger(__name__)
 
-SECONDS_BEFORE_CONTACT_CHECK = config.get('control', 'seconds_before_contact_check')
-SECONDS_BEFORE_DISCONNECT = config.get('control', 'seconds_before_disconnect')
+SECONDS_BEFORE_CONTACT_CHECK = int(config.get('control', 'seconds_before_contact_check'))
+SECONDS_BEFORE_DISCONNECT = int(config.get('control', 'seconds_before_disconnect'))
 
 
 class BrokerStateManager:
