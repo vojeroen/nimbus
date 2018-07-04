@@ -7,10 +7,15 @@ import msgpack
 import zmq
 from redis import StrictRedis
 
+from nimbus import config
 from nimbus.helpers import decode, extract_source_from_message, extract_content_from_message
 from nimbus.log import get_logger
+from nimbus.statemanager import ConnectionStateManager
 
 logger = get_logger(__name__)
+
+SECONDS_BEFORE_CONTACT_CHECK = config.get('control', 'seconds_before_contact_check')
+SECONDS_BEFORE_UNREGISTER = config.get('control', 'seconds_before_unregister')
 
 
 class EmptyQueue(LookupError):
@@ -32,10 +37,10 @@ class ClientRequest:
         self._content = msgpack.unpackb(content)  # dictionary of bytes
         self._method = decode(self._content[b'method'])  # str
         self._endpoint = decode(self._content[b'endpoint'])  # str
-        logger.debug('Creating ClientRequest {}@{}: {}/{}'.format(self._id,
-                                                                  self._endpoint,
-                                                                  self._source,
-                                                                  self._content))
+        logger.debug('Creating or loading ClientRequest {}@{}: {}/{}'.format(self._id,
+                                                                             self._endpoint,
+                                                                             self._source,
+                                                                             self._content))
 
     def __eq__(self, other):
         if isinstance(other, ClientRequest):
@@ -114,6 +119,29 @@ class ClientRequest:
         })
 
 
+class ControlRequest:
+    """
+    Representation of a client request.
+    """
+
+    PING = 'ping'
+    PONG = 'pong'
+    KICK = 'kick'
+
+    _CONTENT = {
+        PING: 'ping',
+        PONG: 'pong',
+        KICK: 'kick',
+    }
+
+    def __init__(self, type_):
+        self._type = type_
+
+    @property
+    def content(self):
+        return {'control': ControlRequest._CONTENT[self._type]}
+
+
 class RequestQueue(abc.MutableMapping):
     """
     Queue of ClientRequests for a specific endpoint.
@@ -161,7 +189,7 @@ class RequestQueue(abc.MutableMapping):
         :param value: 
         :return: 
         """
-        logger.debug('Adding ClientRequest to Queue: {} / {}'.format(value.endpoint, id_))
+        logger.info('Adding ClientRequest to Queue: {} / {}'.format(value.endpoint, id_))
         self._deque.append(id_)
         self._timestamps[id_] = time.time()
         self._redis.set(self.generate_key_content(id_), value.cached_data)
@@ -322,6 +350,10 @@ class RequestManager:
     def __len__(self):
         return len(self._manager)
 
+    @property
+    def registered_workers(self):
+        return list(self._endpoints_by_worker.keys())
+
     def register(self, worker_id, endpoints):
         """
         Registers a Worker to handle ClientRequests for endpoints.
@@ -329,11 +361,26 @@ class RequestManager:
         :param endpoints: 
         :return: 
         """
-        logger.debug('Registering worker {} to RequestManager for endpoints {}'.format(worker_id, endpoints))
+        logger.info('Registering worker {} to RequestManager for endpoints {}'.format(worker_id, endpoints))
         if worker_id in self._endpoints_by_worker:
             raise WorkerIsAlreadyRegistered
         self._endpoints_by_worker[worker_id] = set(endpoints)
         self.worker_available(worker_id)
+
+    def unregister(self, worker_id):
+        """
+        Unregisters a Worker from all its endpoits.
+        :param worker_id: 
+        :return: 
+        """
+        try:
+            del self._endpoints_by_worker[worker_id]
+        except KeyError:
+            pass
+        try:
+            self._waiting_workers.remove(worker_id)
+        except KeyError:
+            pass
 
     def worker_available(self, worker_id):
         """
@@ -341,7 +388,7 @@ class RequestManager:
         :param worker_id: 
         :return: 
         """
-        logger.debug('Worker {} is waiting for next request'.format(worker_id))
+        logger.info('Worker {} is waiting for next request'.format(worker_id))
         self._waiting_workers.add(worker_id)
 
     def append(self, client_request: ClientRequest):
@@ -382,15 +429,16 @@ class RequestManager:
                 self._waiting_workers.remove(worker_id)
             except EmptyQueue:
                 pass
-        logger.debug('To process: {}'.format(to_process))
+        if len(to_process) > 0:
+            logger.debug('To process: {}'.format(to_process))
         return to_process.items()
 
 
 class Broker:
     def __init__(self,
-                 worker_response_bind='tcp://127.0.0.1:5002',
-                 worker_control_bind='tcp://127.0.0.1:5001',
-                 client_bind='tcp://127.0.0.1:5003',
+                 worker_response_bind,
+                 worker_control_bind,
+                 client_bind,
                  redis_host='localhost',
                  redis_port=6379,
                  redis_db=0):
@@ -412,6 +460,21 @@ class Broker:
         self._redis_port = redis_port
         self._redis_db = redis_db
 
+    def send_request(self, worker_id, request):
+        self._worker_control_socket.send_multipart([worker_id, b'', msgpack.packb(request.content)])
+
+    def send_ping(self, worker_id):
+        self._worker_control_socket.send_multipart(
+            [worker_id, b'',
+             msgpack.packb(ControlRequest(ControlRequest.PING).content)]
+        )
+
+    def send_kick(self, worker_id):
+        self._worker_control_socket.send_multipart(
+            [worker_id, b'',
+             msgpack.packb(ControlRequest(ControlRequest.KICK).content)]
+        )
+
     def run(self):
         poller = zmq.Poller()
         poller.register(self._client_socket, zmq.POLLIN)
@@ -422,10 +485,15 @@ class Broker:
                                          redis_port=self._redis_port,
                                          redis_db=self._redis_db)
 
+        state_manager = ConnectionStateManager(seconds_before_contact_check=SECONDS_BEFORE_CONTACT_CHECK,
+                                               seconds_before_disconnect=SECONDS_BEFORE_UNREGISTER)
+
+        poller_timeout = max([int(min([SECONDS_BEFORE_CONTACT_CHECK,
+                                       SECONDS_BEFORE_UNREGISTER]) / 10.0 * 1000),
+                              500])
         loop = True
         while loop:
-            logger.debug('Listening...')
-            sockets = dict(poller.poll())
+            sockets = dict(poller.poll(poller_timeout))
 
             # get a new client request
             if self._client_socket in sockets and sockets[self._client_socket] == zmq.POLLIN:
@@ -444,15 +512,41 @@ class Broker:
                 worker_id = source[0]
                 content = decode(msgpack.unpackb(content))
 
+                state_manager.contact_from(worker_id)
+
                 if 'endpoints' in content:
+                    # first connection to register endpoints
                     request_manager.register(worker_id, content['endpoints'])
 
-                if 'w' in content and content['w']:
-                    request_manager.worker_available(worker_id)
+                if 'ping' in content and content['ping']:
+                    # ping to check if broker is still available
+                    logger.debug('Received ping from {}'.format(worker_id))
+                    if worker_id in request_manager.registered_workers:
+                        # only respond to registered workers, otherwise disconnect
+                        self._worker_control_socket.send_multipart(
+                            [worker_id, b'',
+                             msgpack.packb(ControlRequest(ControlRequest.PONG).content)]
+                        )
+                    else:
+                        # we don't know this worker, so remove it
+                        self.send_kick(worker_id)
+                        state_manager.disconnect(worker_id)
+
+                if 'pong' in content and content['pong']:
+                    logger.debug('Received pong from {}'.format(worker_id))
+
+                if 'disconnect' in content and content['disconnect']:
+                    # disconnect worker
+                    request_manager.unregister(worker_id)
+                    state_manager.disconnect(worker_id)
 
                 if 'r' in content:
+                    # acknowledge reception of task
                     pass
-                # TODO use this to detect non-receiving workers and remove them from the queue
+
+                if 'w' in content and content['w']:
+                    # signal that task is done
+                    request_manager.worker_available(worker_id)
 
             # receive responses and send them back to the client
             if self._worker_response_socket in sockets and sockets[self._worker_response_socket] == zmq.POLLIN:
@@ -473,5 +567,16 @@ class Broker:
 
             # send requests to workers
             for worker_id, request in request_manager():
-                logger.debug('Sending to {}: {}'.format(worker_id, request.content))
-                self._worker_control_socket.send_multipart([worker_id, b'', msgpack.packb(request.content)])
+                logger.info('Sending {} to {}'.format(request.id, worker_id))
+                self.send_request(worker_id, request)
+
+            # send ping messages to workers
+            for worker_id in state_manager.get_connections_to_ping():
+                logger.debug('Pinging {}'.format(worker_id))
+                self.send_ping(worker_id)
+
+            # send kick messages to non-responsive workers
+            for worker_id in state_manager.get_connections_to_disconnect():
+                logger.info('Kicking {}'.format(worker_id))
+                self.send_kick(worker_id)
+                request_manager.unregister(worker_id)

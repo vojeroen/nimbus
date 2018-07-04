@@ -8,7 +8,6 @@ logger = get_logger(__name__)
 
 class Request:
     def __init__(self, request):
-        request = msgpack.unpackb(request)
         self._id = decode(request[b'id'])  # str
         self._method = decode(request[b'method'])  # str
         self._endpoint = decode(request[b'endpoint'])  # str

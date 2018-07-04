@@ -1,7 +1,8 @@
 from nimbus.worker.context import ctx_request
 from nimbus.worker.worker import Worker
 
-worker = Worker()
+worker = Worker(connect_control='tcp://127.0.0.1:5001',
+                connect_response='tcp://127.0.0.1:5002')
 
 
 @ctx_request.route(endpoint='endpoint2', methods=['GET'])
