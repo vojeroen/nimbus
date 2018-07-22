@@ -363,8 +363,8 @@ class RequestManager:
         :return: 
         """
         logger.info('Registering worker {} to RequestManager for endpoints {}'.format(worker_id, endpoints))
-        # if worker_id in self._endpoints_by_worker:
-        #     raise WorkerIsAlreadyRegistered
+        if worker_id in self._endpoints_by_worker:
+            raise WorkerIsAlreadyRegistered
         self._endpoints_by_worker[worker_id] = set(endpoints)
         self.worker_available(worker_id)
 
