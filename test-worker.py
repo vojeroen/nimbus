@@ -2,7 +2,10 @@ from nimbus.worker.context import ctx_request
 from nimbus.worker.worker import Worker
 
 worker = Worker(connect_control='tcp://127.0.0.1:5001',
-                connect_response='tcp://127.0.0.1:5002')
+                connect_response='tcp://127.0.0.1:5002',
+                identity='Worker-1',
+                secret_key='certificates/worker/worker.key_secret',
+                broker_public_key='certificates/broker/broker.key')
 
 
 @ctx_request.route(endpoint='endpoint2', methods=['GET'])

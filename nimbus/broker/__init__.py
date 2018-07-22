@@ -6,6 +6,7 @@ from collections import deque, abc, namedtuple
 import msgpack
 import zmq
 from redis import StrictRedis
+from zmq.auth.thread import ThreadAuthenticator
 
 from nimbus import config
 from nimbus.helpers import decode, extract_source_from_message, extract_content_from_message
@@ -362,8 +363,8 @@ class RequestManager:
         :return: 
         """
         logger.info('Registering worker {} to RequestManager for endpoints {}'.format(worker_id, endpoints))
-        if worker_id in self._endpoints_by_worker:
-            raise WorkerIsAlreadyRegistered
+        # if worker_id in self._endpoints_by_worker:
+        #     raise WorkerIsAlreadyRegistered
         self._endpoints_by_worker[worker_id] = set(endpoints)
         self.worker_available(worker_id)
 
@@ -441,19 +442,34 @@ class Broker:
                  client_bind,
                  redis_host='localhost',
                  redis_port=6379,
-                 redis_db=0):
+                 redis_db=0,
+                 worker_secret_key=None,
+                 worker_public_keys=None):
+        logger.info('Creating worker response socket on {}'.format(worker_response_bind))
+        logger.info('Creating worker control socket on {}'.format(worker_control_bind))
+        logger.info('Creating client socket on {}'.format(client_bind))
+
+        self._worker_context = zmq.Context.instance()
         self._context = zmq.Context.instance()
 
-        logger.info('Creating worker response socket on {}'.format(worker_response_bind))
-        self._worker_response_socket = self._context.socket(zmq.ROUTER)
-        self._worker_response_socket.bind(worker_response_bind)
+        if worker_secret_key is not None and worker_public_keys is not None:
+            self._auth = ThreadAuthenticator(self._worker_context)
+            self._auth.start()
+            self._auth.configure_curve(domain='*', location=worker_public_keys)
 
-        logger.info('Creating worker control socket on {}'.format(worker_control_bind))
-        self._worker_control_socket = self._context.socket(zmq.ROUTER)
-        self._worker_control_socket.bind(worker_control_bind)
-
-        logger.info('Creating client socket on {}'.format(client_bind))
+        self._worker_response_socket = self._worker_context.socket(zmq.ROUTER)
+        self._worker_control_socket = self._worker_context.socket(zmq.ROUTER)
         self._client_socket = self._context.socket(zmq.ROUTER)
+
+        if worker_secret_key is not None and worker_public_keys is not None:
+            for socket in [self._worker_response_socket, self._worker_control_socket]:
+                broker_worker_public, broker_worker_secret = zmq.auth.load_certificate(worker_secret_key)
+                socket.curve_secretkey = broker_worker_secret
+                socket.curve_publickey = broker_worker_public
+                socket.curve_server = True
+
+        self._worker_response_socket.bind(worker_response_bind)
+        self._worker_control_socket.bind(worker_control_bind)
         self._client_socket.bind(client_bind)
 
         self._redis_host = redis_host

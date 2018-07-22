@@ -4,6 +4,7 @@ import traceback
 import msgpack
 import zmq
 from requests import codes
+from zmq.auth.thread import ThreadAuthenticator
 
 from nimbus import config
 from nimbus.helpers import extract_content_from_message, decode
@@ -37,9 +38,15 @@ class BrokerStateManager:
 class Worker:
     def __init__(self,
                  connect_control,
-                 connect_response):
+                 connect_response,
+                 identity=None,
+                 secret_key=None,
+                 broker_public_key=None):
         self._url_connect_control = connect_control
         self._url_connect_response = connect_response
+        self._identity = identity
+        self._secret_key = secret_key
+        self._broker_public_key = broker_public_key
 
     def close(self):
         self._socket_control.close()
@@ -49,11 +56,28 @@ class Worker:
         self._context = zmq.Context.instance()
 
         logger.info('Connecting to broker control socket on {}'.format(self._url_connect_control))
-        self._socket_control = self._context.socket(zmq.DEALER)
-        self._socket_control.connect(self._url_connect_control)
-
         logger.info('Connecting to broker response socket on {}'.format(self._url_connect_response))
+
+        if self._secret_key is not None and self._broker_public_key is not None:
+            self._auth = ThreadAuthenticator(self._context)
+            self._auth.start()
+
+        self._socket_control = self._context.socket(zmq.DEALER)
         self._socket_response = self._context.socket(zmq.REQ)
+
+        if self._identity:
+            self._socket_control.identity = self._identity.encode()
+
+        if self._secret_key is not None and self._broker_public_key is not None:
+            for socket in [self._socket_control, self._socket_response]:
+                worker_public, worker_secret = zmq.auth.load_certificate(self._secret_key)
+                socket.curve_secretkey = worker_secret
+                socket.curve_publickey = worker_public
+
+                broker_public, _ = zmq.auth.load_certificate(self._broker_public_key)
+                socket.curve_serverkey = broker_public
+
+        self._socket_control.connect(self._url_connect_control)
         self._socket_response.connect(self._url_connect_response)
 
     def run(self):

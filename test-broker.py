@@ -10,5 +10,7 @@ broker = Broker(
     client_bind='tcp://127.0.0.1:5003',
     redis_host=REDIS_HOST,
     redis_port=REDIS_PORT,
-    redis_db=REDIS_DB)
+    redis_db=REDIS_DB,
+    worker_secret_key='certificates/broker/broker.key_secret',
+    worker_public_keys='certificates/broker/public')
 broker.run()
