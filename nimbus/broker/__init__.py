@@ -5,10 +5,11 @@ from collections import deque, abc, namedtuple
 
 import msgpack
 import zmq
+import zmq.auth
 from redis import StrictRedis
-from zmq.auth.thread import ThreadAuthenticator
 
 from nimbus import config
+from nimbus.crypto import SecurityManager
 from nimbus.helpers import decode, extract_source_from_message, extract_content_from_message
 from nimbus.log import get_logger
 from nimbus.statemanager import ConnectionStateManager
@@ -363,8 +364,8 @@ class RequestManager:
         :return: 
         """
         logger.info('Registering worker {} to RequestManager for endpoints {}'.format(worker_id, endpoints))
-        if worker_id in self._endpoints_by_worker:
-            raise WorkerIsAlreadyRegistered
+        # if worker_id in self._endpoints_by_worker:
+        #     raise WorkerIsAlreadyRegistered
         self._endpoints_by_worker[worker_id] = set(endpoints)
         self.worker_available(worker_id)
 
@@ -435,6 +436,16 @@ class RequestManager:
         return to_process.items()
 
 
+class BrokerSecurityManager(SecurityManager):
+
+    def secure_socket(self, socket):
+        super().secure_socket(socket)
+        public_key, secret_key = zmq.auth.load_certificate(self._connection_secret_key)
+        socket.curve_secretkey = secret_key
+        socket.curve_publickey = public_key
+        socket.curve_server = True
+
+
 class Broker:
     def __init__(self,
                  worker_response_bind,
@@ -443,30 +454,29 @@ class Broker:
                  redis_host='localhost',
                  redis_port=6379,
                  redis_db=0,
-                 worker_secret_key=None,
-                 worker_public_keys=None):
+                 security_manager=None):
         logger.info('Creating worker response socket on {}'.format(worker_response_bind))
         logger.info('Creating worker control socket on {}'.format(worker_control_bind))
         logger.info('Creating client socket on {}'.format(client_bind))
 
+        if security_manager is None:
+            self.security_manager = SecurityManager()
+        else:
+            self.security_manager = security_manager
+
         self._worker_context = zmq.Context.instance()
         self._context = zmq.Context.instance()
 
-        if worker_secret_key is not None and worker_public_keys is not None:
-            self._auth = ThreadAuthenticator(self._worker_context)
-            self._auth.start()
-            self._auth.configure_curve(domain='*', location=worker_public_keys)
+        if self.security_manager.secure_connection:
+            self.security_manager.configure_connection_security(self._worker_context)
 
         self._worker_response_socket = self._worker_context.socket(zmq.ROUTER)
         self._worker_control_socket = self._worker_context.socket(zmq.ROUTER)
         self._client_socket = self._context.socket(zmq.ROUTER)
 
-        if worker_secret_key is not None and worker_public_keys is not None:
+        if self.security_manager.secure_connection:
             for socket in [self._worker_response_socket, self._worker_control_socket]:
-                broker_worker_public, broker_worker_secret = zmq.auth.load_certificate(worker_secret_key)
-                socket.curve_secretkey = broker_worker_secret
-                socket.curve_publickey = broker_worker_public
-                socket.curve_server = True
+                self.security_manager.secure_socket(socket)
 
         self._worker_response_socket.bind(worker_response_bind)
         self._worker_control_socket.bind(worker_control_bind)
@@ -476,19 +486,25 @@ class Broker:
         self._redis_port = redis_port
         self._redis_db = redis_db
 
-    def send_request(self, worker_id, request):
-        self._worker_control_socket.send_multipart([worker_id, b'', msgpack.packb(request.content)])
-
     def send_ping(self, worker_id):
-        self._worker_control_socket.send_multipart(
-            [worker_id, b'',
-             msgpack.packb(ControlRequest(ControlRequest.PING).content)]
+        self.security_manager.send_message(
+            self._worker_control_socket,
+            ControlRequest(ControlRequest.PING).content,
+            worker_id
+        )
+
+    def send_pong(self, worker_id):
+        self.security_manager.send_message(
+            self._worker_control_socket,
+            ControlRequest(ControlRequest.PONG).content,
+            worker_id
         )
 
     def send_kick(self, worker_id):
-        self._worker_control_socket.send_multipart(
-            [worker_id, b'',
-             msgpack.packb(ControlRequest(ControlRequest.KICK).content)]
+        self.security_manager.send_message(
+            self._worker_control_socket,
+            ControlRequest(ControlRequest.KICK).content,
+            worker_id
         )
 
     def run(self):
@@ -520,10 +536,7 @@ class Broker:
 
             # register endpoints of a worker or mark the worker as waiting
             if self._worker_control_socket in sockets and sockets[self._worker_control_socket] == zmq.POLLIN:
-                message = self._worker_control_socket.recv_multipart()
-                source = extract_source_from_message(message)
-                content = extract_content_from_message(message)
-
+                source, content = self.security_manager.read_socket(self._worker_control_socket)
                 assert len(source) == 1
                 worker_id = source[0]
                 content = decode(msgpack.unpackb(content))
@@ -539,10 +552,7 @@ class Broker:
                     logger.debug('Received ping from {}'.format(worker_id))
                     if worker_id in request_manager.registered_workers:
                         # only respond to registered workers, otherwise disconnect
-                        self._worker_control_socket.send_multipart(
-                            [worker_id, b'',
-                             msgpack.packb(ControlRequest(ControlRequest.PONG).content)]
-                        )
+                        self.send_pong(worker_id)
                     else:
                         # we don't know this worker, so remove it
                         self.send_kick(worker_id)
@@ -566,13 +576,14 @@ class Broker:
 
             # receive responses and send them back to the client
             if self._worker_response_socket in sockets and sockets[self._worker_response_socket] == zmq.POLLIN:
-                message = self._worker_response_socket.recv_multipart()
-                source = extract_source_from_message(message)
-                response = extract_content_from_message(message)
-                response = msgpack.unpackb(response)
+                source, content = self.security_manager.read_socket(self._worker_response_socket)
+                response = msgpack.unpackb(content)
 
-                worker_response = source + [b''] + [b'OK']
-                self._worker_response_socket.send_multipart(worker_response)
+                self.security_manager.send_message(
+                    self._worker_response_socket,
+                    b'OK',
+                    source
+                )
 
                 request = request_manager[response[b'id'].decode()]
                 del request_manager[response[b'id'].decode()]
@@ -584,7 +595,11 @@ class Broker:
             # send requests to workers
             for worker_id, request in request_manager():
                 logger.info('Sending {} to {}'.format(request.id, worker_id))
-                self.send_request(worker_id, request)
+                self.security_manager.send_message(
+                    self._worker_control_socket,
+                    request.content,
+                    worker_id
+                )
 
             # send ping messages to workers
             for worker_id in state_manager.get_connections_to_ping():

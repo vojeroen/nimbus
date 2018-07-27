@@ -4,10 +4,10 @@ import traceback
 import msgpack
 import zmq
 from requests import codes
-from zmq.auth.thread import ThreadAuthenticator
 
 from nimbus import config
-from nimbus.helpers import extract_content_from_message, decode
+from nimbus.crypto import SecurityManager
+from nimbus.helpers import decode
 from nimbus.log import get_logger
 from nimbus.statemanager import ConnectionStateManager
 from nimbus.worker.context import ctx_request
@@ -40,13 +40,15 @@ class Worker:
                  connect_control,
                  connect_response,
                  identity=None,
-                 secret_key=None,
-                 broker_public_key=None):
+                 security_manager=None):
         self._url_connect_control = connect_control
         self._url_connect_response = connect_response
         self._identity = identity
-        self._secret_key = secret_key
-        self._broker_public_key = broker_public_key
+
+        if security_manager is None:
+            self.security_manager = SecurityManager()
+        else:
+            self.security_manager = security_manager
 
     def close(self):
         self._socket_control.close()
@@ -58,24 +60,19 @@ class Worker:
         logger.info('Connecting to broker control socket on {}'.format(self._url_connect_control))
         logger.info('Connecting to broker response socket on {}'.format(self._url_connect_response))
 
-        if self._secret_key is not None and self._broker_public_key is not None:
-            self._auth = ThreadAuthenticator(self._context)
-            self._auth.start()
+        if self.security_manager.secure_connection:
+            self.security_manager.configure_connection_security(self._context)
 
         self._socket_control = self._context.socket(zmq.DEALER)
-        self._socket_response = self._context.socket(zmq.REQ)
+        self._socket_response = self._context.socket(zmq.DEALER)
 
         if self._identity:
             self._socket_control.identity = self._identity.encode()
+            self._socket_response.identity = self._identity.encode()
 
-        if self._secret_key is not None and self._broker_public_key is not None:
+        if self.security_manager.secure_connection:
             for socket in [self._socket_control, self._socket_response]:
-                worker_public, worker_secret = zmq.auth.load_certificate(self._secret_key)
-                socket.curve_secretkey = worker_secret
-                socket.curve_publickey = worker_public
-
-                broker_public, _ = zmq.auth.load_certificate(self._broker_public_key)
-                socket.curve_serverkey = broker_public
+                self.security_manager.secure_socket(socket)
 
         self._socket_control.connect(self._url_connect_control)
         self._socket_response.connect(self._url_connect_response)
@@ -100,8 +97,10 @@ class Worker:
 
         while loop:
             if init_connection:
-                self._socket_control.send_multipart([b'', msgpack.packb({'endpoints': ctx_request.endpoints,
-                                                                         'w': True})])
+                self.security_manager.send_message(
+                    self._socket_control,
+                    {'endpoints': ctx_request.endpoints, 'w': True}
+                )
                 init_connection = False
 
             sockets = dict(poller.poll(poller_timeout))
@@ -111,7 +110,7 @@ class Worker:
 
             if self._socket_control in sockets and sockets[self._socket_control] == zmq.POLLIN:
                 # get message content
-                content = extract_content_from_message(self._socket_control.recv_multipart())
+                source, content = self.security_manager.read_socket(self._socket_control, verify='broker')
                 content = msgpack.unpackb(content)
 
                 state_manager.contact_from_broker()
@@ -121,18 +120,23 @@ class Worker:
                     control = decode(content[b'control'])
                     if control == 'ping':
                         # logger.debug('Received ping from broker')
-                        self._socket_control.send_multipart([b'', msgpack.packb({'pong': True})])
+                        self.security_manager.send_message(
+                            self._socket_control,
+                            {'pong': True}
+                        )
                     elif control == 'pong':
-                        # logger.debug('Received pong from broker')
+                        logger.debug('Received pong from broker')
                         pass
                     elif control == 'kick':
                         init_connection = True
 
-
                 # process client request messages
                 else:
                     message = Request(content)
-                    self._socket_control.send_multipart([b'', msgpack.packb({'r': message.id})])
+                    self.security_manager.send_message(
+                        self._socket_control,
+                        {'r': message.id}
+                    )
                     try:
                         logger.info('Received: {} {}'.format(message.method, message.endpoint))
                         service = ctx_request.get_service_by_endpoint(message.endpoint, message.method)
@@ -150,17 +154,29 @@ class Worker:
                         logger.error(traceback.extract_tb(sys.exc_info()[2]))
                         response = {}
                         status = codes.SERVER_ERROR
-                    self._socket_response.send(msgpack.packb({'id': message.id,
-                                                              'status': status,
-                                                              'response': response}))
-                    self._socket_control.send_multipart([b'', msgpack.packb({'w': True})])
+                    self.security_manager.send_message(
+                        self._socket_response,
+                        {'id': message.id,
+                         'status': status,
+                         'response': response}
+                    )
+                    self.security_manager.send_message(
+                        self._socket_control,
+                        {'w': True}
+                    )
                     self._socket_response.recv()
 
             if state_manager.ping_broker():
-                # logger.debug('Pinging broker')
-                self._socket_control.send_multipart([b'', msgpack.packb({'ping': True})])
+                logger.debug('Pinging broker')
+                self.security_manager.send_message(
+                    self._socket_control,
+                    {'ping': True}
+                )
 
             if state_manager.disconnect_broker():
                 logger.info('Disconnecting from broker')
-                self._socket_control.send_multipart([b'', msgpack.packb({'disconnect': True})])
+                self.security_manager.send_message(
+                    self._socket_control,
+                    {'disconnect': True}
+                )
                 raise RuntimeError

@@ -1,4 +1,4 @@
-from nimbus.broker import Broker
+from nimbus.broker import Broker, BrokerSecurityManager
 
 REDIS_HOST = '192.168.0.237'
 REDIS_PORT = 6379
@@ -11,6 +11,11 @@ broker = Broker(
     redis_host=REDIS_HOST,
     redis_port=REDIS_PORT,
     redis_db=REDIS_DB,
-    worker_secret_key='certificates/broker/broker.key_secret',
-    worker_public_keys='certificates/broker/public')
+    security_manager=BrokerSecurityManager(
+        connection_secret_key='keys/connection/broker/broker.key_secret',
+        connection_public_keys='keys/connection/broker/public',
+        message_secret_key='keys/message/broker/broker.secret.pem',
+        message_public_keys='keys/message/broker/public'
+    )
+)
 broker.run()
