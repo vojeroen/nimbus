@@ -7,7 +7,7 @@ from requests import codes
 
 from nimbus import config
 from nimbus.crypto import SecurityManager
-from nimbus.helpers import decode
+from nimbus.helpers.message import decode
 from nimbus.log import get_logger
 from nimbus.statemanager import ConnectionStateManager
 from nimbus.worker.context import ctx_request

@@ -1,6 +1,6 @@
 import msgpack
 
-from nimbus.helpers import decode
+from nimbus.helpers.message import decode
 from nimbus.log import get_logger
 
 logger = get_logger(__name__)

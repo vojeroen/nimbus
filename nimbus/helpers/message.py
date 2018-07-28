@@ -1,6 +1,5 @@
 import datetime
 
-import pytz
 import zmq
 
 from nimbus.log import get_logger
@@ -29,19 +28,6 @@ def extract_content_from_message(message):
     content = message[empty + 1:]
     assert len(content) == 1
     return content[0]
-
-
-def unix_to_ts(unix_timestamp):
-    return pytz.utc.localize(datetime.datetime.utcfromtimestamp(unix_timestamp))
-
-
-def ts_to_unix(timestamp):
-    diff = timestamp - pytz.utc.localize(datetime.datetime(1970, 1, 1))
-    return int(diff.total_seconds())
-
-
-def get_utc_int():
-    return ts_to_unix(pytz.utc.localize(datetime.datetime.utcnow()))
 
 
 def get_data_from_zmq(socket, timeout):

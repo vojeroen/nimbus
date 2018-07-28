@@ -10,7 +10,7 @@ from redis import StrictRedis
 
 from nimbus import config
 from nimbus.crypto import SecurityManager
-from nimbus.helpers import decode, extract_source_from_message, extract_content_from_message
+from nimbus.helpers.message import decode, extract_source_from_message, extract_content_from_message
 from nimbus.log import get_logger
 from nimbus.statemanager import ConnectionStateManager
 

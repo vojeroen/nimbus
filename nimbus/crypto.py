@@ -7,7 +7,7 @@ from Crypto.Signature import DSS
 from zmq.auth import CURVE_ALLOW_ANY
 from zmq.auth.thread import ThreadAuthenticator
 
-from nimbus.helpers import extract_source_from_message, extract_content_from_message
+from nimbus.helpers.message import extract_source_from_message, extract_content_from_message
 
 
 class SecurityManager:

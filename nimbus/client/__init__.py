@@ -3,7 +3,7 @@ from collections import namedtuple
 import msgpack
 import zmq
 
-from nimbus.helpers import decode, get_data_from_zmq
+from nimbus.helpers.message import decode, get_data_from_zmq
 from nimbus.log import get_logger
 
 ZMQ_TIMEOUT_SEC = 10
@@ -47,7 +47,7 @@ class Client:
         else:
             response = Response(zmq_response[b'response'],
                                 zmq_response[b'status'])
-        logger.debug('Response: {} - {}'.format(str(response.status_code), str(response.response)))
+        logger.debug('Response: {}'.format(str(response.status_code), str(response.response)))
         return response
 
     def get(self, endpoint, parameters=None, data=None, decode_response=True):

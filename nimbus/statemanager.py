@@ -1,4 +1,4 @@
-from nimbus.helpers import get_utc_int
+from nimbus.helpers.timestamp import get_utc_int
 
 
 class ConnectionStateManager:
