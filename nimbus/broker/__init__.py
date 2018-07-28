@@ -144,6 +144,20 @@ class ControlRequest:
         return {'control': ControlRequest._CONTENT[self._type]}
 
 
+class MockRedis:
+    def __init__(self):
+        self._dict = {}
+
+    def set(self, key, value):
+        self._dict[key] = value
+
+    def get(self, key, default_value=None):
+        return self._dict.get(key, default_value)
+
+    def delete(self, key):
+        del self._dict[key]
+
+
 class RequestQueue(abc.MutableMapping):
     """
     Queue of ClientRequests for a specific endpoint.
@@ -158,7 +172,10 @@ class RequestQueue(abc.MutableMapping):
         self._id = uuid.uuid4().hex
         self._deque = deque()  # to keep the order of the keys
         self._timestamps = dict()  # to quickly determine if a key is still in the deque, and keep the timestamp
-        self._redis = StrictRedis(host=redis_host, port=redis_port, db=redis_db)
+        if redis_host is not None and redis_host is not None and redis_db is not None:
+            self._redis = StrictRedis(host=redis_host, port=redis_port, db=redis_db)
+        else:
+            self._redis = MockRedis()
 
     def generate_key_content(self, id_):
         return 'broker:' + self._id + ':request:content:' + id_
@@ -451,9 +468,9 @@ class Broker:
                  worker_response_bind,
                  worker_control_bind,
                  client_bind,
-                 redis_host='localhost',
-                 redis_port=6379,
-                 redis_db=0,
+                 redis_host=None,
+                 redis_port=None,
+                 redis_db=None,
                  security_manager=None):
         logger.info('Creating worker response socket on {}'.format(worker_response_bind))
         logger.info('Creating worker control socket on {}'.format(worker_control_bind))
