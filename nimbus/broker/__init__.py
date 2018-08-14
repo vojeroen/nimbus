@@ -20,6 +20,10 @@ SECONDS_BEFORE_CONTACT_CHECK = int(config.get('control', 'seconds_before_contact
 SECONDS_BEFORE_UNREGISTER = int(config.get('control', 'seconds_before_unregister'))
 
 
+class InvalidEndpoint(RuntimeError):
+    pass
+
+
 class EmptyQueue(LookupError):
     pass
 
@@ -408,7 +412,12 @@ class RequestManager:
         :return: 
         """
         logger.info('Worker {} is waiting for next request'.format(worker_id))
-        self._waiting_workers.add(worker_id)
+        try:
+            self._endpoints_by_worker[worker_id]
+        except KeyError:
+            logger.warning('Worker is not registered: {}'.format(worker_id))
+        else:
+            self._waiting_workers.add(worker_id)
 
     def append(self, client_request: ClientRequest):
         """
@@ -471,7 +480,8 @@ class Broker:
                  redis_host=None,
                  redis_port=None,
                  redis_db=None,
-                 security_manager=None):
+                 security_manager=None,
+                 validate_endpoints=None):
         logger.info('Creating worker response socket on {}'.format(worker_response_bind))
         logger.info('Creating worker control socket on {}'.format(worker_control_bind))
         logger.info('Creating client socket on {}'.format(client_bind))
@@ -502,6 +512,12 @@ class Broker:
         self._redis_host = redis_host
         self._redis_port = redis_port
         self._redis_db = redis_db
+
+        if validate_endpoints is None:
+            def validate_endpoints(worker_id, endpoints):
+                return endpoints
+
+        self._validate_endpoints = validate_endpoints
 
     def send_ping(self, worker_id):
         self.security_manager.send_message(
@@ -561,8 +577,23 @@ class Broker:
                 state_manager.contact_from(worker_id)
 
                 if 'endpoints' in content:
-                    # first connection to register endpoints
-                    request_manager.register(worker_id, content['endpoints'])
+                    try:
+                        # validate endpoints
+                        validated_endpoints = self._validate_endpoints(worker_id, content['endpoints'])
+                    except InvalidEndpoint:
+                        # deny connection
+                        logger.info('Deny connection: {}'.format(worker_id))
+                        request_manager.unregister(worker_id)
+                        state_manager.disconnect(worker_id)
+                        self.security_manager.send_message(
+                            self._worker_control_socket,
+                            {'control': 'denied'},
+                            worker_id
+                        )
+                    else:
+                        # first connection to register endpoints
+                        request_manager.register(worker_id,
+                                                 validated_endpoints)
 
                 if 'ping' in content and content['ping']:
                     # ping to check if broker is still available

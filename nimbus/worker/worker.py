@@ -129,6 +129,8 @@ class Worker:
                         pass
                     elif control == 'kick':
                         init_connection = True
+                    elif control == 'denied':
+                        raise RuntimeError('Denied by broker')
 
                 # process client request messages
                 else:
@@ -179,4 +181,4 @@ class Worker:
                     self._socket_control,
                     {'disconnect': True}
                 )
-                raise RuntimeError
+                raise RuntimeError('Disconnecting from broker')
