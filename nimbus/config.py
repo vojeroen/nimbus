@@ -1,7 +1,9 @@
 import configparser
 
+CONFIG_FILE_PATH = 'configuration'
+
 cparser = configparser.ConfigParser()
-cparser.read('configuration')
+cparser.read(CONFIG_FILE_PATH)
 
 
 def get(*args, **kwargs):
