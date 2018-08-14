@@ -1,0 +1,2 @@
+class ConnectionTimeoutError(RuntimeError):
+    pass

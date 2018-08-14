@@ -2,6 +2,7 @@ import datetime
 
 import zmq
 
+from nimbus.errors import ConnectionTimeoutError
 from nimbus.log import get_logger
 
 logger = get_logger(__name__)
@@ -46,6 +47,6 @@ def get_data_from_zmq(socket, timeout):
 
         if launch_timestamp + datetime.timedelta(seconds=int(timeout / 1000)) < datetime.datetime.now():
             logger.debug('Timeout')
-            finished = True
+            raise ConnectionTimeoutError('Timeout when polling socket {}'.format(socket))
 
     return {}
