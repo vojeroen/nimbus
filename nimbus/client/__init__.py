@@ -59,6 +59,9 @@ class Client:
     def post(self, endpoint, parameters=None, data=None, decode_response=True):
         return self.send_and_recv('POST', endpoint, parameters, data, decode_response)
 
+    def put(self, endpoint, parameters=None, data=None, decode_response=True):
+        return self.send_and_recv('PUT', endpoint, parameters, data, decode_response)
+
     def patch(self, endpoint, parameters=None, data=None, decode_response=True):
         return self.send_and_recv('PATCH', endpoint, parameters, data, decode_response)
 
