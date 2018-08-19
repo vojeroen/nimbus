@@ -1,4 +1,5 @@
 import datetime
+from collections.abc import Iterable
 
 from nimbus.worker.errors import DataNotCorrect
 
@@ -20,9 +21,9 @@ class Serializer:
         self._object = obj
         self._serialized_data = None
         if isinstance(obj, self.__class__.MODEL):
-            self._is_list = False
-        elif list_allowed and isinstance(obj, list):
-            self._is_list = True
+            self._is_iterable = False
+        elif list_allowed and isinstance(obj, Iterable):
+            self._is_iterable = True
         else:
             raise DataNotCorrect
 
@@ -37,7 +38,7 @@ class Serializer:
         return self._serialized_data
 
     def _serialize(self):
-        if self._is_list:
+        if self._is_iterable:
             data = []
             for obj in self._object:
                 data.append(self.__class__(obj).data)
