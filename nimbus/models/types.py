@@ -1,7 +1,6 @@
 import uuid
 
 from sqlalchemy import types
-from sqlalchemy import String, Integer
 
 
 class UUID(types.TypeDecorator):
@@ -17,7 +16,7 @@ class UUID(types.TypeDecorator):
         if value and isinstance(value, uuid.UUID):
             return value.hex
         elif value and not isinstance(value, uuid.UUID):
-            raise ValueError, 'value %s is not a valid uuid.UUID' % value
+            raise ValueError('value %s is not a valid uuid.UUID' % value)
         else:
             return None
 
