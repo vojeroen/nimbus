@@ -1,6 +1,6 @@
 import configparser
 
-CONFIG_FILE_PATH = 'configuration'
+CONFIG_FILE_PATH = 'configuration.ini'
 
 cparser = configparser.ConfigParser()
 cparser.read(CONFIG_FILE_PATH)
