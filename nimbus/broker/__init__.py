@@ -43,10 +43,9 @@ class ClientRequest:
         self._content = msgpack.unpackb(content)  # dictionary of bytes
         self._method = decode(self._content[b'method'])  # str
         self._endpoint = decode(self._content[b'endpoint'])  # str
-        logger.debug('Creating or loading ClientRequest {}@{}: {}/{}'.format(self._id,
+        logger.debug('Creating or loading ClientRequest {}@{}: {}'.format(self._id,
                                                                              self._endpoint,
-                                                                             self._source,
-                                                                             self._content))
+                                                                             self._source))
 
     def __eq__(self, other):
         if isinstance(other, ClientRequest):
