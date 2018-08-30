@@ -32,7 +32,8 @@ class ConnectionStateManager:
     def get_connections_to_ping(self):
         connection_ids = [connection_id
                           for connection_id, last_contact in self._last_contact.items()
-                          if get_utc_int() - last_contact > self._seconds_before_contact_check]
+                          if get_utc_int() - last_contact > self._seconds_before_contact_check
+                          and connection_id not in self._checking_connection]
         for connection_id in connection_ids:
             del self._last_contact[connection_id]
             self._checking_connection[connection_id] = get_utc_int()
