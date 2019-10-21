@@ -7,5 +7,5 @@ pyzmq==15.3.0
 redis==2.10.6
 requests==2.18.4
 SQLAlchemy==1.0.14
-urllib3==1.22
+urllib3==1.24.2
 zmq==0.0.0
